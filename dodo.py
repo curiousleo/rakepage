@@ -7,8 +7,13 @@ import os, os.path
 from contextlib import closing
 import yaml, jinja2, textile, codecs
 
+DOIT_CONFIG = {'default_tasks': ['gen']}
+
 SITEMAP = yaml.load('''
-- index: My Index
+- index: Homepage
+- pages: Page Layout
+- paragraphs: Writing Paragraph Text
+- phrasemods: Using Phrase Modifiers
 ''')
 
 YAML_CONF = '''
@@ -30,62 +35,54 @@ options:
 
 CONF = yaml.load(YAML_CONF)
 
+TEMPLATE = None
+
 def task_create():
     """
     Create a new site.
     """
     
-    new_site = {
-        CONF['input']['dir']:
-            {'index.textile': 'h1. Index'},
-        CONF['media']['dir']:
-            {'default.css': ''},
-        CONF['template']['path']: '',
-        CONF['output']['dir']: {},
-    }
+    NEW_SITE = (
+        (os.path.join(CONF['input']['dir'], 'index' + CONF['input']['ext']),
+            'h1. Index'),
+        (os.path.join(CONF['media']['dir'], 'default.css'), 
+            ''),
+        (os.path.join(CONF['template']['path']),
+            '<html><head><title>{{ title }}</title></head>'
+            '<body>{{ content }}</body></html>'),
+    )
 
+    def write_default(target, content):
+        input_enc = CONF['input']['enc']
 
-    def get_targets(sitepath=''):
-        def flatten(x):
-            result = []
-            for el in x:
-                if hasattr(el, "__iter__") and not isinstance(el, basestring):
-                    result.extend(flatten(el))
-                else: result.append(el)
-            return result
+        with closing(codecs.open(target, mode='wb',
+            encoding=input_enc)) as targetf:
+            targetf.write(content)
 
-        def create_targets_list(site=new_site, root='.'):
-            for target, content in site.iteritems():
-                target = os.path.join(root, target)
-                if isinstance(content, basestring):
-                    yield \
-                        os.path.join(sitepath, target) if sitepath else target
-                elif type(content) == dict:
-                    if content:
-                        yield \
-                            os.path.join(sitepath, target) if sitepath \
-                                                           else target
-                        yield create_targets_list(content, target)
-        
-        return map(os.path.normpath, flatten(create_targets_list()))
-
-    def write_defaults(site=new_site, root='.', sitepath='.'):
-        for target, content in site.iteritems():
-            target = os.path.join(root, target)
-            if isinstance(content, basestring):
-                fname = os.path.join(sitepath, target) if sitepath else target
-                with closing(open(fname, 'w')) as f: f.write(content)
-            elif type(content) == dict:
-                if content: 
-                    if not os.path.exists(target): os.mkdir(target)
-                    write_defaults(content, target)
-        return True
-
-    yield  {'name': 'create',
-            'actions': [(write_defaults,)],
-            'targets': get_targets(),
+    for target, content in NEW_SITE:
+        yield {
+            'name': target,
+            'actions': [(write_default, (target, content))],
             'run_once': True
-            }
+        }
+
+def task_load_template():
+    '''
+    Load the template.
+    '''
+    INPUT_ENC = CONF['input']['enc']
+
+    def load_template():
+        with closing(codecs.open(CONF['template']['path'],
+            encoding=INPUT_ENC)) as templatef:
+            global TEMPLATE
+            TEMPLATE = jinja2.Template(templatef.read())
+            return True
+        return False
+
+    return {
+        'actions': [(load_template,)]
+    }
 
 def task_gen():
     """
@@ -95,12 +92,6 @@ def task_gen():
     INPUT_ENC = CONF['input']['enc']
     OUTPUT_ENC = CONF['output']['enc']
 
-    def load_template():
-        with closing(codecs.open(CONF['template']['path'],
-            encoding=INPUT_ENC)) as templatef:
-            return jinja2.Template(templatef.read())
-
-    TEMPLATE = load_template()
     src_name = lambda page: os.path.join(
         CONF['input']['dir'], page['name'] + CONF['input']['ext'])
     dst_name = lambda page: os.path.join(
@@ -113,6 +104,9 @@ def task_gen():
             name, title = page.items()[0]
             yield {'title': title, 'name': name}
 
+    def ensure_dir_exists(dirname):
+        if not os.path.isdir(dirname): os.makedirs(dirname)
+
     def process_page(src, dst, page):
         with closing(codecs.open(src, encoding=INPUT_ENC)) as srcf:
             context = {
@@ -120,6 +114,7 @@ def task_gen():
                 'navigation': map(navi_entry, get_pages()),
                 'content': textile.textile(srcf.read())}
             transformed = TEMPLATE.render(context)
+        ensure_dir_exists(os.path.split(dst)[0])
         with closing(codecs.open(dst, mode='wb', encoding=OUTPUT_ENC)) as dstf:
             dstf.write(transformed)
             return True
@@ -131,7 +126,9 @@ def task_gen():
         yield {
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
-            'file_dep': [dep, CONF['template']['path']],
+            'task_dep': ['load_template'],
+            'file_dep': ['dodo.py', dep, CONF['template']['path']],
             'targets': [target]
         }
+
 
