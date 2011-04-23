@@ -1,71 +1,34 @@
+# vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
+
 # To be used with 'doit'.
 # Tasks defined: create, gen, serve, publish
 
-import os
-import os.path
+import os, os.path
 from contextlib import closing
-import yaml
+import yaml, jinja2, textile, codecs
 
-DEFAULT_CONF = '''
+SITEMAP = yaml.load('''
+- index: My Index
+''')
+
+YAML_CONF = '''
 input:
     enc: utf-8
     ext: .textile
-options:
-    preview: true
+    dir: pages
 output:
     enc: utf-8
     ext: .html
-    type: local
+    dir: output
+media:
+    dir: media
+template:
+    path: template.html
+options:
+    preview: true
 '''
-CONF = yaml.load(DEFAULT_CONF)
 
-PAGE_DIR = 'pages'
-OUTPUT_DIR = 'output'
-PAGES = []
-SRC_FILES = []
-DST_FILES = []
-
-def get_pages():
-    for page in CONF['sitemap']:
-        name, title = page.items()[0]
-        # yield {'title': title, 'path': name}
-        PAGES.append({'title': title, 'path': name})
-
-def get_dst_files():
-    for page in PAGES:
-        # yield os.path.join(
-            # conf['output']['dir'], page['name'] + conf['output']['ext'])
-        DST_FILES.append(os.path.join(
-            OUTPUT_DIR, page['name'] + CONF['output']['ext']))
-
-def get_src_files():
-    for page in PAGES:
-        # yield os.path.join(
-            # conf['input']['dir'], page['name'] + conf['input']['ext'])
-        DST_FILES.append(os.path.join(
-            PAGE_DIR, page['name'] + CONF['input']['ext']))
-
-def load_conf(confpath):
-    def deep_merge(dst, src):
-        '''
-        Merges src into dst, returns dst.
-        Credits: Manuel Muradas <http://bit.ly/fOPgyW>
-        '''
-        stack = [(dst, src)]
-        while stack:
-            current_dst, current_src = stack.pop()
-            for key in current_src:
-                if key not in current_dst: current_dst[key] = current_src[key]
-                else:
-                    if isinstance(current_src[key], dict) and \
-                        isinstance(current_dst[key], dict):
-                        stack.append((current_dst[key], current_src[key]))
-                    else:
-                        current_dst[key] = current_src[key]
-        return dst
-
-    with closing(open(confpath)) as confpath:
-        deep_merge(CONF, yaml.load(confpath))
+CONF = yaml.load(YAML_CONF)
 
 def task_create():
     """
@@ -73,15 +36,12 @@ def task_create():
     """
     
     new_site = {
-        'config.yaml': DEFAULT_CONF,
-        'pages':
-            {'index.textile': ''},
-        'media':
+        CONF['input']['dir']:
+            {'index.textile': 'h1. Index'},
+        CONF['media']['dir']:
             {'default.css': ''},
-        'templates':
-            {'default.mustache': ''},
-        'site': {},
-        'output': {},
+        CONF['template']['path']: '',
+        CONF['output']['dir']: {},
     }
 
 
@@ -119,15 +79,12 @@ def task_create():
                 if content: 
                     if not os.path.exists(target): os.mkdir(target)
                     write_defaults(content, target)
+        return True
 
     yield  {'name': 'create',
             'actions': [(write_defaults,)],
             'targets': get_targets(),
-            # 'params':[{'name': 'layout',
-                       # 'short': 'l',
-                       # 'default': 'basic'}],
-            'run_once': True,
-            'clean': ['rm -rf %s' % 'output']
+            'run_once': True
             }
 
 def task_gen():
@@ -135,13 +92,46 @@ def task_gen():
     Generate a site.
     """
 
-    return {'actions': [(load_conf, get_pages, get_src_files, get_dst_files)],
-            'targets': ['test'],
-            'params':[{'name': 'confpath',
-                       'short': 'c',
-                       'long': 'conf',
-                       'default': CONF['options']['conf']}],
-            }
+    INPUT_ENC = CONF['input']['enc']
+    OUTPUT_ENC = CONF['output']['enc']
 
-# vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
+    def load_template():
+        with closing(codecs.open(CONF['template']['path'],
+            encoding=INPUT_ENC)) as templatef:
+            return jinja2.Template(templatef.read())
+
+    TEMPLATE = load_template()
+    src_name = lambda page: os.path.join(
+        CONF['input']['dir'], page['name'] + CONF['input']['ext'])
+    dst_name = lambda page: os.path.join(
+        CONF['output']['dir'], page['name'] + CONF['output']['ext'])
+    navi_entry = lambda page: {'title': page['title'],
+        'url': page['name'] + CONF['output']['ext']}
+
+    def get_pages():
+        for page in SITEMAP:
+            name, title = page.items()[0]
+            yield {'title': title, 'name': name}
+
+    def process_page(src, dst, page):
+        with closing(codecs.open(src, encoding=INPUT_ENC)) as srcf:
+            context = {
+                'title': page['title'],
+                'navigation': map(navi_entry, get_pages()),
+                'content': textile.textile(srcf.read())}
+            transformed = TEMPLATE.render(context)
+        with closing(codecs.open(dst, mode='wb', encoding=OUTPUT_ENC)) as dstf:
+            dstf.write(transformed)
+            return True
+        return False
+
+    for page in list(get_pages()):
+        dep = src_name(page); target = dst_name(page)
+
+        yield {
+            'name': page['name'],
+            'actions': [(process_page, (dep, target, page))],
+            'file_dep': [dep, CONF['template']['path']],
+            'targets': [target]
+        }
 
