@@ -5,13 +5,19 @@ import os
 import os.path
 from contextlib import closing
 
+conf = '''
+input:      {enc: utf-8, ext: .textile}
+options:    {conf: _site.yaml, preview: true, template: _template.html}
+output:     {dir: ., enc: utf-8, ext: .html, type: local}
+'''
+
 def task_create():
     """
     Create a new site.
     """
     
     new_site = {
-        'config.yaml': '',
+        'config.yaml': conf,
         'pages':
             {'index.textile': ''},
         'media':
@@ -36,9 +42,13 @@ def task_create():
                 target = os.path.join(root, target)
                 if isinstance(content, basestring):
                     yield \
-                        sitepath + os.path.sep + target if sitepath else target
+                        os.path.join(sitepath, target) if sitepath else target
                 elif type(content) == dict:
-                    if content: yield create_targets_list(content, target)
+                    if content:
+                        yield \
+                            os.path.join(sitepath, target) if sitepath \
+                                                           else target
+                        yield create_targets_list(content, target)
         
         return map(os.path.normpath, flatten(create_targets_list()))
 
@@ -58,7 +68,20 @@ def task_create():
             # 'params':[{'name': 'layout',
                        # 'short': 'l',
                        # 'default': 'basic'}],
-            'clean': False
+            'clean': ['rm -rf %s' % ' '.join(get_targets())],
+            'run_once': True
+            }
+
+def task_gen():
+    """
+    Generate a site.
+    """
+
+    return {'actions': [],
+            'targets': [],
+            # 'params':[{'name': 'layout',
+                       # 'short': 'l',
+                       # 'default': 'basic'}],
             }
 
 # vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
