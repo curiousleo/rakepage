@@ -1,6 +1,7 @@
 # To be used with 'doit'.
 # Tasks defined: create, gen, serve, publish
 
+import os
 import os.path
 from contextlib import closing
 
@@ -30,31 +31,34 @@ def task_create():
                 else: result.append(el)
             return result
 
-        def create_targets_list(content=new_site, target=''):
-            for target, content in new_site.iteritems():
-                if type(content) == str:
+        def create_targets_list(site=new_site, root='.'):
+            for target, content in site.iteritems():
+                target = os.path.join(root, target)
+                if isinstance(content, basestring):
                     yield \
                         sitepath + os.path.sep + target if sitepath else target
                 elif type(content) == dict:
                     if content: yield create_targets_list(content, target)
+        
+        return map(os.path.normpath, flatten(create_targets_list()))
 
-        return flatten(create_targets_list())
-
-    def write_defaults(content=new_site, target='', sitepath=''):
-        for target, content in new_site.iteritems():
-            if type(content) == str or type(content) == unicode:
-                fname = sitepath + os.path.sep + target if sitepath else target
-                with closing(fname) as f: f.write(content)
+    def write_defaults(site=new_site, root='.', sitepath='.'):
+        for target, content in site.iteritems():
+            target = os.path.join(root, target)
+            if isinstance(content, basestring):
+                fname = os.path.join(sitepath, target) if sitepath else target
+                with closing(open(fname, 'w')) as f: f.write(content)
             elif type(content) == dict:
-                if content: write_defaults(content, target)
+                if content: 
+                    if not os.path.exists(target): os.mkdir(target)
+                    write_defaults(content, target)
 
     return {'actions': [(write_defaults,)],
             'targets': get_targets(),
             # 'params':[{'name': 'layout',
                        # 'short': 'l',
                        # 'default': 'basic'}],
-            'verbosity': 2,
-            'clean': True
+            'clean': False
             }
 
 # vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
