@@ -5,15 +5,16 @@
 
 import os, os.path, shutil, codecs, yaml, pystache, pystache.template, textile
 from contextlib import closing
+from doit.tools import create_folder
 
 DOIT_CONFIG = {'default_tasks': ['gen']}
 
-SITEMAP = yaml.load('''
+YAML_SITEMAP = '''
 - index: Homepage
 - pages: Page Layout
 - paragraphs: Writing Paragraph Text
 - phrasemods: Using Phrase Modifiers
-''')
+'''
 
 YAML_CONF = '''
 input:
@@ -32,9 +33,34 @@ options:
     preview: true
 '''
 
+def get_pages():
+    for page in SITEMAP:
+        name, title = page.items()[0]
+        yield {'title': title, 'name': name}
+
+def get_media_files():
+    for dirpath, _, filenames in os.walk(CONF['media']['dir']):
+        for filename in filenames:
+            yield os.path.join(dirpath, filename)
+
+page_src_name = lambda page: os.path.join(
+    CONF['input']['dir'], page['name'] + CONF['input']['ext'])
+page_dst_name = lambda page: os.path.join(
+    CONF['output']['dir'], page['name'] + CONF['output']['ext'])
+media_dst_name = lambda mediafile: os.path.join(
+    CONF['output']['dir'],
+    os.path.sep.join(mediafile.split(os.path.sep)[1:]))
+
 CONF = yaml.load(YAML_CONF)
+SITEMAP = yaml.load(YAML_SITEMAP)
 
 TEMPLATE = None
+
+PAGES = list(get_pages())
+PAGES_SRC = [page_src_name(p) for p in PAGES]
+PAGES_DST = [page_dst_name(p) for p in PAGES]
+MEDIAFILES_SRC = list(get_media_files())
+MEDIAFILES_DST = [media_dst_name(f) for f in MEDIAFILES_SRC]
 
 def task_create():
     """
@@ -106,31 +132,24 @@ def task_gen():
     Generate a site.
     """
 
+    yield {
+        'name': 'pages',
+        'actions': None,
+        'file_dep': PAGES_DST
+    }
+
+    yield {
+        'name': 'mediafiles',
+        'actions': None,
+        'file_dep': MEDIAFILES_DST
+    }
+
+def task_process_page():
     INPUT_ENC = CONF['input']['enc']
     OUTPUT_ENC = CONF['output']['enc']
 
-    page_src_name = lambda page: os.path.join(
-        CONF['input']['dir'], page['name'] + CONF['input']['ext'])
-    page_dst_name = lambda page: os.path.join(
-        CONF['output']['dir'], page['name'] + CONF['output']['ext'])
-    media_dst_name = lambda mediafile: os.path.join(
-        CONF['output']['dir'],
-        os.path.sep.join(mediafile.split(os.path.sep)[1:]))
     navi_entry = lambda page: {'title': page['title'],
         'url': page['name'] + CONF['output']['ext']}
-
-    def get_pages():
-        for page in SITEMAP:
-            name, title = page.items()[0]
-            yield {'title': title, 'name': name}
-
-    def get_media_files():
-        for dirpath, _, filenames in os.walk(CONF['media']['dir']):
-            for filename in filenames:
-                yield os.path.join(dirpath, filename)
-
-    def ensure_dir_exists(dirname):
-        if not os.path.isdir(dirname): os.makedirs(dirname)
 
     def process_page(src, dst, page):
         with closing(codecs.open(src, encoding=INPUT_ENC)) as srcf:
@@ -139,19 +158,13 @@ def task_gen():
                 'navigation': map(navi_entry, get_pages()),
                 'content': textile.textile(srcf.read())}
             transformed = pystache.render(template=TEMPLATE, context=context)
-        ensure_dir_exists(os.path.split(dst)[0])
+        create_folder(os.path.split(dst)[0])
         with closing(codecs.open(dst, mode='wb', encoding=OUTPUT_ENC)) as dstf:
             dstf.write(transformed)
             return True
         return False
 
-    def safe_copy(src, dst):
-        ensure_dir_exists(os.path.split(dst)[0])
-        shutil.copy2(src, dst)
-
-    for page in get_pages():
-        dep = page_src_name(page); target = page_dst_name(page)
-
+    for dep, target, page in zip(PAGES_SRC, PAGES_DST, PAGES):
         yield {
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
@@ -161,13 +174,16 @@ def task_gen():
             'clean': True
         }
 
-    for mediafile in get_media_files():
-        dep = mediafile; target = media_dst_name(mediafile)
+def task_copy_mediafile():
+    def safe_copy(src, dst):
+        create_folder(os.path.split(dst)[0])
+        shutil.copy2(src, dst)
 
+    for dep, target in zip(MEDIAFILES_SRC, MEDIAFILES_DST):
         yield {
-            'name': mediafile,
+            'name': dep,
             'actions': [(safe_copy, (dep, target))],
-            'file_dep': ['dodo.py', mediafile],
+            'file_dep': ['dodo.py', dep],
             'targets': [target],
             'clean': True
         }
