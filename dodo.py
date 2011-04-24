@@ -5,27 +5,27 @@
 #
 # TODO: Switch to markdown with 'meta' and 'tables' extensions.
 # TODO: Sitemap -> a simple list of pages; read titles from the pages' files
-# TODO: Convert ALL pages in pages folder.
 
-import os, os.path, shutil, codecs, yaml, pystache, pystache.template, textile
+import os, os.path, shutil, codecs, yaml
 from contextlib import closing
 from doit.tools import create_folder
+import markdown, pystache
 
 # ----------------------------------------------------------------------------
-# CONFIGURATION --------------------------------------------------------------
+# SETTINGS -------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
-YAML_SITEMAP = '''
-- index: Homepage
-- pages: Page Layout
-- paragraphs: Writing Paragraph Text
-- phrasemods: Using Phrase Modifiers
-'''
+CONF_PATH = 'site.yaml'
 
-YAML_CONF = '''
+# ----------------------------------------------------------------------------
+# PREPARATION ----------------------------------------------------------------
+# ----------------------------------------------------------------------------
+
+# Don't change this -- put your settings in 'site.yaml'
+DEFAULT_CONF = '''
 input:
     enc: utf-8
-    ext: .textile
+    ext: .mkd
     dir: pages
 output:
     enc: utf-8
@@ -36,20 +36,30 @@ options:
     media: media                            # path to media folder
 '''
 
-# ----------------------------------------------------------------------------
-# PREPARATION ----------------------------------------------------------------
-# ----------------------------------------------------------------------------
+DOIT_CONFIG = {'default_tasks': ['gen']}
 
-DOIT_CONFIG = {
-    'default_tasks': ['gen'],
-    'continue': True,
-    'verbosity': 2
-}
+def deep_merge(dst, src):
+    '''Merges src into dst, returns dst.
+    Credits: Manuel Muradas <http://bit.ly/fOPgyW>'''
+    stack = [(dst, src)]
+    while stack:
+        current_dst, current_src = stack.pop()
+        for key in current_src:
+            if key not in current_dst: current_dst[key] = current_src[key]
+            else:
+                if isinstance(current_src[key], dict) and \
+                    isinstance(current_dst[key], dict):
+                    stack.append((current_dst[key], current_src[key]))
+                else:
+                    current_dst[key] = current_src[key]
+    return dst
 
 def get_pages():
-    for page in SITEMAP:
-        name, title = page.items()[0]
-        yield {'title': title, 'name': name}
+    for page in get_files(CONF['input']['dir']):
+        if not page.endswith(CONF['input']['ext']): continue
+        yield {
+            'name': os.path.split(page)[1],
+            'path': os.path.relpath(page, CONF['input']['dir'])}
 
 def get_files(root):
     for dirpath, _, filenames in os.walk(root):
@@ -57,23 +67,22 @@ def get_files(root):
             yield os.path.join(dirpath, filename)
 
 get_media_files = lambda: get_files(CONF['options']['media'])
-
 page_src_name = lambda page: os.path.join(
-    CONF['input']['dir'], page['name'] + CONF['input']['ext'])
+    CONF['input']['dir'], page['path'])
 page_dst_name = lambda page: os.path.join(
-    CONF['output']['dir'], page['name'] + CONF['output']['ext'])
+    CONF['output']['dir'],
+    page['path'][:-len(CONF['input']['ext'])] + CONF['output']['ext'])
 media_dst_name = lambda mediafile: os.path.join(
     CONF['output']['dir'],
     os.path.sep.join(mediafile.split(os.path.sep)[1:]))
 
-CONF = yaml.load(YAML_CONF)
-SITEMAP = yaml.load(YAML_SITEMAP)
+DEFAULT_CONF = yaml.load(DEFAULT_CONF)
+CONF = DEFAULT_CONF
+SITEMAP = None
 
+MENU = None
 TEMPLATE = None
 
-PAGES = list(get_pages())
-PAGES_SRC = [page_src_name(p) for p in PAGES]
-PAGES_DST = [page_dst_name(p) for p in PAGES]
 MEDIAFILES_SRC = list(get_media_files())
 MEDIAFILES_DST = [media_dst_name(f) for f in MEDIAFILES_SRC]
 
@@ -90,7 +99,7 @@ def task_create():
 
     DATA_DIR = None
     try: DATA_DIR = os.environ['PP_DATA']
-    except KeyError: print 'PP_DATA environment variable not set.'
+    except KeyError: pass
 
     def existing(dirname, filenames):
         return [f for f in filenames
@@ -117,29 +126,30 @@ def task_gen():
     """
     Generate the site.
     """
-
     def rm_unneeded():
         targets = (get_files(CONF['output']['dir']))
         targets = (t for t in targets if not t in MEDIAFILES_DST)
-        targets = (t for t in targets if not t in PAGES_DST)
+        targets = (t for t in targets if not t in
+            (page_dst_name(p) for p in get_pages()))
+
         for target in targets: os.remove(target)
 
     yield {
-        'name': 'cleanup_output',
+        'name': 'cleanup',
         'actions': [(rm_unneeded,)]
     }
 
     yield {
         'name': 'pages',
         'actions': None,
-        'task_dep': ['process_page'],
+        'task_dep': ['load_conf', 'create_menu', 'process_page'],
         'clean': True
     }
 
     yield {
         'name': 'mediafiles',
         'actions': None,
-        'task_dep': ['copy_mediafile'],
+        'task_dep': ['load_conf', 'copy_mediafile'],
         'clean': True
 
     }
@@ -180,22 +190,62 @@ def task_serve():
 # HELPERS --------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
+def task_load_conf():
+    def load_conf():
+        global CONF, SITEMAP
+        CONF = yaml.load(codecs.open(
+            CONF_PATH, encoding=DEFAULT_CONF['input']['enc']))
+        CONF = deep_merge(DEFAULT_CONF, CONF)
+        SITEMAP = CONF['menu']
+
+    return {
+        'actions': [(load_conf,)],
+        'file_dep': [CONF_PATH, 'dodo.py']}
+
+def task_create_menu():
+    """
+    Generate the site.
+    """
+    INPUT_ENC = CONF['input']['enc']
+
+    output_url = lambda page_path: \
+        page_path[len(CONF['input']['dir']) + 1: \
+            -len(CONF['input']['ext'])] + CONF['output']['ext']
+
+    def navi_entry(page):
+        page_path = os.path.join(CONF['input']['dir'],
+            page + CONF['input']['ext'])
+        md = markdown.Markdown(extensions=['meta'])
+        with closing(codecs.open(page_path, encoding=INPUT_ENC)) as srcf:
+            md.convert(srcf.read()),
+        return {
+            'title': md.Meta['title'][0],
+            'url': output_url(page_path)}
+
+    def create_menu():
+        global MENU
+        MENU = map(navi_entry, SITEMAP)
+        return str(MENU)
+
+    return {
+        'actions': [(create_menu,)],
+        'file_dep': [CONF_PATH, 'dodo.py']}
+
 def task_process_page():
     '''
     Process individual page.
     '''
+
     INPUT_ENC = CONF['input']['enc']
     OUTPUT_ENC = CONF['output']['enc']
 
-    navi_entry = lambda page: {'title': page['title'],
-        'url': page['name'] + CONF['output']['ext']}
-
     def process_page(src, dst, page):
+        md = markdown.Markdown(extensions=['meta'])
         with closing(codecs.open(src, encoding=INPUT_ENC)) as srcf:
             context = {
-                'title': page['title'],
-                'navigation': map(navi_entry, get_pages()),
-                'content': textile.textile(srcf.read())}
+                'navigation': MENU,
+                'content': md.convert(srcf.read()),
+                'title': md.Meta['title'][0]}
             transformed = pystache.render(template=TEMPLATE, context=context)
         create_folder(os.path.split(dst)[0])
         with closing(codecs.open(dst, mode='wb', encoding=OUTPUT_ENC)) as dstf:
@@ -203,12 +253,15 @@ def task_process_page():
             return True
         return False
 
-    for dep, target, page in zip(PAGES_SRC, PAGES_DST, PAGES):
+    src_dst_p = lambda p: (page_src_name(p), page_dst_name(p), p)
+
+    for dep, target, page in (src_dst_p(p) for p in get_pages()):
         yield {
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
             'setup': ['load_template'],
-            'file_dep': ['dodo.py', dep, CONF['options']['template']],
+            'file_dep': [CONF_PATH, 'dodo.py', dep,
+                CONF['options']['template']],
             'targets': [target],
             'clean': True
         }
