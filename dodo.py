@@ -1,7 +1,11 @@
 # vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
 
 # To be used with 'doit'.
-# Tasks defined: create, gen, serve, publish
+# Tasks defined: create, gen, serve, publish (<- not yet)
+#
+# TODO: Switch to markdown with 'meta' and 'tables' extensions.
+# TODO: Sitemap -> a simple list of pages; read titles from the pages' files
+# TODO: Convert ALL pages in pages folder.
 
 import os, os.path, shutil, codecs, yaml, pystache, pystache.template, textile
 from contextlib import closing
@@ -204,7 +208,7 @@ def task_process_page():
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
             'setup': ['load_template'],
-            'file_dep': [dep, CONF['options']['template']],
+            'file_dep': ['dodo.py', dep, CONF['options']['template']],
             'targets': [target],
             'clean': True
         }
@@ -221,7 +225,7 @@ def task_copy_mediafile():
         yield {
             'name': os.path.sep.join(dep.split(os.path.sep)[1:]),
             'actions': [(safe_copy, (dep, target))],
-            'file_dep': [dep],
+            'file_dep': ['dodo.py', dep],
             'targets': [target],
             'clean': True
         }
