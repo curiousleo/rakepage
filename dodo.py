@@ -89,14 +89,15 @@ def task_create():
         return [f for f in filenames
             if os.path.exists(os.path.join(dirname, f))]
 
-    def copy_defaults():
-        shutil.copytree(DATA_DIR, '.', ignore=existing)
+    def mkdir_copy(src, dst):
+        create_folder(os.path.split(dst)[0])
+        shutil.copy2(src, dst)
 
     for target in get_files(DATA_DIR):
         dst = target.replace(DATA_DIR, '')
         yield {
-            'name': target,
-            'actions': [(shutil.copy2, (target, dst))],
+            'name': dst,
+            'actions': [(mkdir_copy, (target, dst))],
             'run_once': True
         }
 
@@ -167,7 +168,7 @@ def task_process_page():
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
             'setup': ['load_template'],
-            'file_dep': ['dodo.py', dep, CONF['options']['template']],
+            'file_dep': [dep, CONF['options']['template']],
             'targets': [target],
             'clean': True
         }
@@ -184,7 +185,7 @@ def task_copy_mediafile():
         yield {
             'name': os.path.sep.join(dep.split(os.path.sep)[1:]),
             'actions': [(safe_copy, (dep, target))],
-            'file_dep': ['dodo.py', dep],
+            'file_dep': [dep],
             'targets': [target],
             'clean': True
         }
