@@ -27,19 +27,21 @@ output:
     enc: utf-8
     ext: .html
     dir: output
-media:
-    dir: media
-template:
-    path: template.mustache
 options:
-    preview: true
+    template: template.mustache     # path to template
+    media: media                    # path to media folder
 '''
 
 # ----------------------------------------------------------------------------
 # PREPARATION ----------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
-DOIT_CONFIG = {'default_tasks': ['gen']}
+DOIT_CONFIG = {
+    'default_tasks': ['gen'],
+    'process': 3,
+    'continue': True,
+    'verbosity': 2
+}
 
 def get_pages():
     for page in SITEMAP:
@@ -47,7 +49,7 @@ def get_pages():
         yield {'title': title, 'name': name}
 
 def get_media_files():
-    for dirpath, _, filenames in os.walk(CONF['media']['dir']):
+    for dirpath, _, filenames in os.walk(CONF['options']['media']):
         for filename in filenames:
             yield os.path.join(dirpath, filename)
 
@@ -81,7 +83,7 @@ def task_create():
 
     FOLDERS = (
         CONF['input']['dir'],
-        CONF['media']['dir'],
+        CONF['options']['media'],
         CONF['output']['dir'],
     )
     
@@ -90,7 +92,7 @@ def task_create():
             'h1. Index'),
         (os.path.join(FOLDERS[1], 'style.css'), ''),
         (os.path.join(FOLDERS[1], 'plugins.js'), ''),
-        (os.path.join(CONF['template']['path']),
+        (os.path.join(CONF['options']['template']),
             '<html><head><title>{{title}}</title></head>'
             '<body>{{{content}}</body></html>'),
     )
@@ -127,11 +129,10 @@ def task_load_template():
     INPUT_ENC = CONF['input']['enc']
 
     def load_template():
-        with closing(codecs.open(CONF['template']['path'],
+        with closing(codecs.open(CONF['options']['template'],
             encoding=INPUT_ENC)) as templatef:
             global TEMPLATE
             TEMPLATE = templatef.read()
-            print 'Template loaded.'
             return True
         return False
 
@@ -149,15 +150,24 @@ def task_gen():
     """
 
     yield {
+        'name': 'clean',
+        'actions': None,
+        'clean': ['rm -r %s/*' % CONF['output']['dir']]
+    }
+
+    yield {
         'name': 'pages',
         'actions': None,
-        'task_dep': ['process_page']
+        'task_dep': ['process_page'],
+        'clean': True
     }
 
     yield {
         'name': 'mediafiles',
         'actions': None,
-        'task_dep': ['copy_mediafile']
+        'task_dep': ['copy_mediafile'],
+        'clean': True
+
     }
 
 def task_process_page():
@@ -184,8 +194,8 @@ def task_process_page():
         yield {
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
-            'task_dep': ['load_template'],
-            'file_dep': ['dodo.py', dep, CONF['template']['path']],
+            'setup': ['load_template'],
+            'file_dep': ['dodo.py', dep, CONF['options']['template']],
             'targets': [target],
             'clean': True
         }
