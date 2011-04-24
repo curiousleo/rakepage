@@ -28,8 +28,8 @@ output:
     ext: .html
     dir: output
 options:
-    template: template.mustache     # path to template
-    media: media                    # path to media folder
+    template: templates/template.mustache   # path to template
+    media: media                            # path to media folder
 '''
 
 # ----------------------------------------------------------------------------
@@ -48,10 +48,12 @@ def get_pages():
         name, title = page.items()[0]
         yield {'title': title, 'name': name}
 
-def get_media_files():
-    for dirpath, _, filenames in os.walk(CONF['options']['media']):
+def get_files(root):
+    for dirpath, _, filenames in os.walk(root):
         for filename in filenames:
             yield os.path.join(dirpath, filename)
+
+get_media_files = lambda: get_files(CONF['options']['media'])
 
 page_src_name = lambda page: os.path.join(
     CONF['input']['dir'], page['name'] + CONF['input']['ext'])
@@ -122,37 +124,24 @@ def task_create():
             'run_once': True
         }
 
-def task_load_template():
-    '''
-    Load the template.
-    '''
-    INPUT_ENC = CONF['input']['enc']
-
-    def load_template():
-        with closing(codecs.open(CONF['options']['template'],
-            encoding=INPUT_ENC)) as templatef:
-            global TEMPLATE
-            TEMPLATE = templatef.read()
-            return True
-        return False
-
-    return {
-        'actions': [(load_template,)]
-    }
-
 # ----------------------------------------------------------------------------
 # GEN ------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 
 def task_gen():
     """
-    Generate a site.
+    Generate the site.
     """
 
+    def rm_unneeded():
+        targets = (get_files(CONF['output']['dir']))
+        targets = (t for t in targets if not t in MEDIAFILES_DST)
+        targets = (t for t in targets if not t in PAGES_DST)
+        for target in targets: os.remove(target)
+
     yield {
-        'name': 'clean',
-        'actions': None,
-        'clean': ['rm -r %s/*' % CONF['output']['dir']]
+        'name': 'cleanup_output',
+        'actions': [(rm_unneeded,)]
     }
 
     yield {
@@ -170,7 +159,14 @@ def task_gen():
 
     }
 
+# ----------------------------------------------------------------------------
+# HELPERS --------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+
 def task_process_page():
+    '''
+    Process individual page.
+    '''
     INPUT_ENC = CONF['input']['enc']
     OUTPUT_ENC = CONF['output']['enc']
 
@@ -201,6 +197,9 @@ def task_process_page():
         }
 
 def task_copy_mediafile():
+    '''
+    Copy individual file (media -> output).
+    '''
     def safe_copy(src, dst):
         create_folder(os.path.split(dst)[0])
         shutil.copy2(src, dst)
@@ -214,3 +213,20 @@ def task_copy_mediafile():
             'clean': True
         }
 
+def task_load_template():
+    '''
+    Load the template.
+    '''
+    INPUT_ENC = CONF['input']['enc']
+
+    def load_template():
+        with closing(codecs.open(CONF['options']['template'],
+            encoding=INPUT_ENC)) as templatef:
+            global TEMPLATE
+            TEMPLATE = templatef.read()
+            return True
+        return False
+
+    return {
+        'actions': [(load_template,)]
+    }
