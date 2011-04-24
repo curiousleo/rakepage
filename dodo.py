@@ -1,13 +1,15 @@
 # vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
 
 # To be used with 'doit'.
-# Tasks defined: create, gen, serve, publish
+# Tasks defined: create, gen, publish
 
 import os, os.path, shutil, codecs, yaml, pystache, pystache.template, textile
 from contextlib import closing
 from doit.tools import create_folder
 
-DOIT_CONFIG = {'default_tasks': ['gen']}
+# ----------------------------------------------------------------------------
+# CONFIGURATION --------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 YAML_SITEMAP = '''
 - index: Homepage
@@ -32,6 +34,12 @@ template:
 options:
     preview: true
 '''
+
+# ----------------------------------------------------------------------------
+# PREPARATION ----------------------------------------------------------------
+# ----------------------------------------------------------------------------
+
+DOIT_CONFIG = {'default_tasks': ['gen']}
 
 def get_pages():
     for page in SITEMAP:
@@ -61,6 +69,10 @@ PAGES_SRC = [page_src_name(p) for p in PAGES]
 PAGES_DST = [page_dst_name(p) for p in PAGES]
 MEDIAFILES_SRC = list(get_media_files())
 MEDIAFILES_DST = [media_dst_name(f) for f in MEDIAFILES_SRC]
+
+# ----------------------------------------------------------------------------
+# CREATE ---------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 def task_create():
     """
@@ -126,6 +138,10 @@ def task_load_template():
     return {
         'actions': [(load_template,)]
     }
+
+# ----------------------------------------------------------------------------
+# GEN ------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 
 def task_gen():
     """
