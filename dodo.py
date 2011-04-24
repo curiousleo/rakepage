@@ -3,9 +3,8 @@
 # To be used with 'doit'.
 # Tasks defined: create, gen, serve, publish
 
-import os, os.path
+import os, os.path, shutil, codecs, yaml, pystache, pystache.template, textile
 from contextlib import closing
-import yaml, jinja2, textile, codecs
 
 DOIT_CONFIG = {'default_tasks': ['gen']}
 
@@ -28,7 +27,7 @@ output:
 media:
     dir: media
 template:
-    path: template.html
+    path: template.mustache
 options:
     preview: true
 '''
@@ -41,15 +40,21 @@ def task_create():
     """
     Create a new site.
     """
+
+    FOLDERS = (
+        CONF['input']['dir'],
+        CONF['media']['dir'],
+        CONF['output']['dir'],
+    )
     
-    NEW_SITE = (
-        (os.path.join(CONF['input']['dir'], 'index' + CONF['input']['ext']),
+    FILES = (
+        (os.path.join(FOLDERS[0], 'index' + CONF['input']['ext']),
             'h1. Index'),
-        (os.path.join(CONF['media']['dir'], 'default.css'), 
-            ''),
+        (os.path.join(FOLDERS[1], 'style.css'), ''),
+        (os.path.join(FOLDERS[1], 'plugins.js'), ''),
         (os.path.join(CONF['template']['path']),
-            '<html><head><title>{{ title }}</title></head>'
-            '<body>{{ content }}</body></html>'),
+            '<html><head><title>{{title}}</title></head>'
+            '<body>{{{content}}</body></html>'),
     )
 
     def write_default(target, content):
@@ -59,7 +64,18 @@ def task_create():
             encoding=input_enc)) as targetf:
             targetf.write(content)
 
-    for target, content in NEW_SITE:
+    def makedirs_catch_errors(target):
+        try: os.makedirs(target)
+        except OSError: pass
+
+    for target in FOLDERS:
+        yield {
+            'name': target,
+            'actions': [(makedirs_catch_errors, (target,))],
+            'run_once': True
+        }
+
+    for target, content in FILES:
         yield {
             'name': target,
             'actions': [(write_default, (target, content))],
@@ -76,7 +92,8 @@ def task_load_template():
         with closing(codecs.open(CONF['template']['path'],
             encoding=INPUT_ENC)) as templatef:
             global TEMPLATE
-            TEMPLATE = jinja2.Template(templatef.read())
+            TEMPLATE = templatef.read()
+            print 'Template loaded.'
             return True
         return False
 
@@ -92,10 +109,13 @@ def task_gen():
     INPUT_ENC = CONF['input']['enc']
     OUTPUT_ENC = CONF['output']['enc']
 
-    src_name = lambda page: os.path.join(
+    page_src_name = lambda page: os.path.join(
         CONF['input']['dir'], page['name'] + CONF['input']['ext'])
-    dst_name = lambda page: os.path.join(
+    page_dst_name = lambda page: os.path.join(
         CONF['output']['dir'], page['name'] + CONF['output']['ext'])
+    media_dst_name = lambda mediafile: os.path.join(
+        CONF['output']['dir'],
+        os.path.sep.join(mediafile.split(os.path.sep)[1:]))
     navi_entry = lambda page: {'title': page['title'],
         'url': page['name'] + CONF['output']['ext']}
 
@@ -103,6 +123,11 @@ def task_gen():
         for page in SITEMAP:
             name, title = page.items()[0]
             yield {'title': title, 'name': name}
+
+    def get_media_files():
+        for dirpath, _, filenames in os.walk(CONF['media']['dir']):
+            for filename in filenames:
+                yield os.path.join(dirpath, filename)
 
     def ensure_dir_exists(dirname):
         if not os.path.isdir(dirname): os.makedirs(dirname)
@@ -113,22 +138,37 @@ def task_gen():
                 'title': page['title'],
                 'navigation': map(navi_entry, get_pages()),
                 'content': textile.textile(srcf.read())}
-            transformed = TEMPLATE.render(context)
+            transformed = pystache.render(template=TEMPLATE, context=context)
         ensure_dir_exists(os.path.split(dst)[0])
         with closing(codecs.open(dst, mode='wb', encoding=OUTPUT_ENC)) as dstf:
             dstf.write(transformed)
             return True
         return False
 
-    for page in list(get_pages()):
-        dep = src_name(page); target = dst_name(page)
+    def safe_copy(src, dst):
+        ensure_dir_exists(os.path.split(dst)[0])
+        shutil.copy2(src, dst)
+
+    for page in get_pages():
+        dep = page_src_name(page); target = page_dst_name(page)
 
         yield {
             'name': page['name'],
             'actions': [(process_page, (dep, target, page))],
             'task_dep': ['load_template'],
             'file_dep': ['dodo.py', dep, CONF['template']['path']],
-            'targets': [target]
+            'targets': [target],
+            'clean': True
         }
 
+    for mediafile in get_media_files():
+        dep = mediafile; target = media_dst_name(mediafile)
+
+        yield {
+            'name': mediafile,
+            'actions': [(safe_copy, (dep, target))],
+            'file_dep': ['dodo.py', mediafile],
+            'targets': [target],
+            'clean': True
+        }
 
