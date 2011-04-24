@@ -1,7 +1,7 @@
 # vim: set fileencoding=utf8 expandtab tabstop=4 shiftwidth=4 softtabstop=4:
 
 # To be used with 'doit'.
-# Tasks defined: create, gen, publish
+# Tasks defined: create, gen, serve, publish
 
 import os, os.path, shutil, codecs, yaml, pystache, pystache.template, textile
 from contextlib import closing
@@ -134,6 +134,28 @@ def task_gen():
         'task_dep': ['copy_mediafile'],
         'clean': True
 
+    }
+
+# ----------------------------------------------------------------------------
+# SERVE ----------------------------------------------------------------------
+# ----------------------------------------------------------------------------
+
+def task_serve():
+    """
+    Serve the site via SimpleHTTPServer.
+    """
+
+    def serve_site():
+        root = os.curdir
+        os.chdir(CONF['output']['dir'])
+        import shlex, subprocess
+        subprocess.Popen(shlex.split('python -m SimpleHTTPServer 8000'))
+        os.chdir(root)
+
+    yield {
+        'name': 'serve',
+        'actions': [(serve_site,)],
+        'task_dep': ['gen']
     }
 
 # ----------------------------------------------------------------------------
