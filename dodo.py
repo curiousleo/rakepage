@@ -3,8 +3,7 @@
 # To be used with 'doit'.
 # Tasks defined: create, gen, serve, publish (<- not yet)
 #
-# TODO: Switch to markdown with 'meta' and 'tables' extensions.
-# TODO: Sitemap -> a simple list of pages; read titles from the pages' files
+# TODO: Publish task
 
 import os, os.path, shutil, codecs, yaml
 from contextlib import closing
