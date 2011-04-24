@@ -73,6 +73,8 @@ PAGES_DST = [page_dst_name(p) for p in PAGES]
 MEDIAFILES_SRC = list(get_media_files())
 MEDIAFILES_DST = [media_dst_name(f) for f in MEDIAFILES_SRC]
 
+PID = None
+
 # ----------------------------------------------------------------------------
 # CREATE ---------------------------------------------------------------------
 # ----------------------------------------------------------------------------
@@ -82,6 +84,7 @@ def task_create():
     Create a new site.
     """
 
+    DATA_DIR = None
     try: DATA_DIR = os.environ['PP_DATA']
     except KeyError: print 'PP_DATA environment variable not set.'
 
@@ -93,13 +96,14 @@ def task_create():
         create_folder(os.path.split(dst)[0])
         shutil.copy2(src, dst)
 
-    for target in get_files(DATA_DIR):
-        dst = target.replace(DATA_DIR, '')
-        yield {
-            'name': dst,
-            'actions': [(mkdir_copy, (target, dst))],
-            'run_once': True
-        }
+    if DATA_DIR:
+        for target in get_files(DATA_DIR):
+            dst = target.replace(DATA_DIR, '')
+            yield {
+                'name': dst,
+                'actions': [(mkdir_copy, (target, dst))],
+                'run_once': True
+            }
 
 # ----------------------------------------------------------------------------
 # GEN ------------------------------------------------------------------------
@@ -145,17 +149,27 @@ def task_serve():
     Serve the site via SimpleHTTPServer.
     """
 
-    def serve_site():
-        root = os.curdir
-        os.chdir(CONF['output']['dir'])
-        import shlex, subprocess
-        subprocess.Popen(shlex.split('python -m SimpleHTTPServer 8000'))
-        os.chdir(root)
+    def serve_site(preview):
+        global PID
+        if PID == None:
+            root = os.path.abspath(os.curdir)
+            os.chdir(CONF['output']['dir'])
+            import shlex, subprocess, signal, webbrowser, atexit
+            PID = subprocess.Popen(shlex.split(
+                'python -m SimpleHTTPServer 8000')).pid
+            atexit.register(os.kill, PID, signal.SIGKILL)
+            if preview: webbrowser.open('http://0.0.0.0:8000/')
+            os.chdir(root)
 
     yield {
         'name': 'serve',
         'actions': [(serve_site,)],
-        'task_dep': ['gen']
+        'task_dep': ['gen'],
+        'params': [{
+            'name': 'preview',
+            'long': 'preview',
+            'short': 'p',
+            'default': True}]
     }
 
 # ----------------------------------------------------------------------------
