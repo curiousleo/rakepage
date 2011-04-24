@@ -135,13 +135,13 @@ def task_gen():
     yield {
         'name': 'pages',
         'actions': None,
-        'file_dep': PAGES_DST
+        'task_dep': ['process_page']
     }
 
     yield {
         'name': 'mediafiles',
         'actions': None,
-        'file_dep': MEDIAFILES_DST
+        'task_dep': ['copy_mediafile']
     }
 
 def task_process_page():
@@ -181,7 +181,7 @@ def task_copy_mediafile():
 
     for dep, target in zip(MEDIAFILES_SRC, MEDIAFILES_DST):
         yield {
-            'name': dep,
+            'name': os.path.sep.join(dep.split(os.path.sep)[1:]),
             'actions': [(safe_copy, (dep, target))],
             'file_dep': ['dodo.py', dep],
             'targets': [target],
