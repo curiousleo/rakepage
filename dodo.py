@@ -38,7 +38,6 @@ options:
 
 DOIT_CONFIG = {
     'default_tasks': ['gen'],
-    'process': 3,
     'continue': True,
     'verbosity': 2
 }
@@ -83,44 +82,21 @@ def task_create():
     Create a new site.
     """
 
-    FOLDERS = (
-        CONF['input']['dir'],
-        CONF['options']['media'],
-        CONF['output']['dir'],
-    )
-    
-    FILES = (
-        (os.path.join(FOLDERS[0], 'index' + CONF['input']['ext']),
-            'h1. Index'),
-        (os.path.join(FOLDERS[1], 'style.css'), ''),
-        (os.path.join(FOLDERS[1], 'plugins.js'), ''),
-        (os.path.join(CONF['options']['template']),
-            '<html><head><title>{{title}}</title></head>'
-            '<body>{{{content}}</body></html>'),
-    )
+    try: DATA_DIR = os.environ['PP_DATA']
+    except KeyError: print 'PP_DATA environment variable not set.'
 
-    def write_default(target, content):
-        input_enc = CONF['input']['enc']
+    def existing(dirname, filenames):
+        return [f for f in filenames
+            if os.path.exists(os.path.join(dirname, f))]
 
-        with closing(codecs.open(target, mode='wb',
-            encoding=input_enc)) as targetf:
-            targetf.write(content)
+    def copy_defaults():
+        shutil.copytree(DATA_DIR, '.', ignore=existing)
 
-    def makedirs_catch_errors(target):
-        try: os.makedirs(target)
-        except OSError: pass
-
-    for target in FOLDERS:
+    for target in get_files(DATA_DIR):
+        dst = target.replace(DATA_DIR, '')
         yield {
             'name': target,
-            'actions': [(makedirs_catch_errors, (target,))],
-            'run_once': True
-        }
-
-    for target, content in FILES:
-        yield {
-            'name': target,
-            'actions': [(write_default, (target, content))],
+            'actions': [(shutil.copy2, (target, dst))],
             'run_once': True
         }
 
