@@ -1,0 +1,80 @@
+Title: Page Läyout
+
+Page Layout
+===========
+
+Headings (Yay!)
+---------------
+
+This is a Heading 1
+
+This might be an introductory paragraph on the general topic.
+
+Heading 2 gets more specific
+
+Now we're getting into the details.
+
+Block Quotations
+
+Even Mr. Sedaris, a noted luddite, has finally succumbed to doing his writing on a computer.  The Internet, however, remains an idiotic trifle:
+
+bq. I've never seen the Internet. I don't have email. I just enjoy lying on the couch and reading a magazine. When people say, "You should visit my Web page," I'm always perplexed by it. Why? What do you do there?
+
+Haven't we all pondered that at one time or another?
+
+Bullet lists
+
+Textile has several advantages over HTML:
+
+* It's easier on the eyes
+* You don't have to write all those HTML tags
+** By not writing the tags yourself, you're less likely to make coding mistakes
+** It requires fewer keystrokes
+*** You don't wear out the keys on your keyboard as fast
+*** You won't wear out your fingers as fast
+* You can write it much quicker
+
+Numbered lists
+
+# Gather bread, peanut butter, and jelly
+# Slice the bread if necessary
+# Assemble the sandwich
+## Spread peanut butter on one slice of bread
+## Put jelly on another slice
+## Put the two slices together
+# Enjoy
+
+Mixed nested lists
+
+Three reasons to walk to work:
+
+# It saves fuel
+# It's good for your health
+** Walking burns calories
+** Time outside means lower stress
+# It's good for the environment
+
+Definition lists
+
+- coffee := Hot and black
+- tea := Also hot, but a little less black
+- milk :=
+Nourishing beverage for baby cows.
+
+Cold drink that goes great with cookies. =:
+
+Footnotes
+
+42.7% of all statistics are made up on the spot.[1]
+
+fn1. "Dr. Katz":http://en.wikiquote.org/wiki/Steven_Wright
+
+Tables
+
+|_. name|_. age|
+|Walter|5|
+|Florence|6|
+
+Divisions
+
+div. A simple div.

@@ -1,0 +1,8 @@
+menu:
+    - index
+    - pages
+    - paragraphs
+    - phrasemods
+
+output:
+    ext: .htm
