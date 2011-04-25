@@ -20,10 +20,10 @@ $menu = nil
 config.merge! YAML.load File.open 'site.yaml'
 
 SRC_ASSETS = FileList[
-  File.join(config['assets'], '**', '*')].
-    find_all {|f| FileTest.file?(f)}
+  File.join config['assets'], '**', '*'].
+    find_all {|f| FileTest.file? f}
 SRC_PAGES = FileList[
-  File.join(config['input_dir'], '**', '*' + config['input_ext'])]
+  File.join config['input_dir'], '**', '*' + config['input_ext']]
 
 OUT_ASSETS = SRC_ASSETS.collect do |s|
   s.sub config['assets'], config['output_dir']; end
@@ -31,8 +31,8 @@ OUT_PAGES = SRC_PAGES.collect do |s|
   s.sub(config['input_dir'], config['output_dir']).
     ext config['output_ext']; end
 
-CLEAN.include('.menu.yaml')
-CLOBBER.include(OUT_ASSETS + OUT_PAGES)
+CLEAN.include '.menu.yaml'
+CLOBBER.include OUT_ASSETS + OUT_PAGES
 
 task :default => :gen
 
@@ -78,12 +78,11 @@ def parse_file src
 
   meta = YAML.load(pieces[2]) || {}
   content = pieces[4..-1].join.strip
-
   [meta, content]
 end
 
 def make_page out, src, template
-  meta, content = *parse_file(src)
+  meta, content = parse_file src
   context = {
     :content => Kramdown::Document.new(content).to_html,
     :title => meta['Title'] || meta['title'],
