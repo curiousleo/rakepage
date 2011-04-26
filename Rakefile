@@ -35,7 +35,7 @@ desc 'generate the site'
 task :gen => OUT_PAGES + OUT_ASSETS + ['Rakefile'] do
 end
 
-file '.menu.yaml' => ['site.yaml'] do |t|
+file '.menu.yaml' => ['site.yaml'] + SRC_PAGES do |t|
   $menu = []
   config['menu'].each do |p|
     src = File.join config['input_dir'], p + config['input_ext']
@@ -49,7 +49,7 @@ file '.menu.yaml' => ['site.yaml'] do |t|
 end
 
 def dir_exists! f
-    mkpath File.dirname(out), :verbose => false
+    mkpath File.dirname(f), :verbose => false
 end
 
 SRC_PAGES.zip(OUT_PAGES).each do |src, out|
@@ -72,8 +72,8 @@ def parse_file src
   pieces = content.split(/^(-{3})/).compact
   if pieces.size < 3
     raise RuntimeError.new(
-      "The file '#{filename}' does not seem to have a metadata section."
-  ); end
+      "The file '#{filename}' does not seem to have a metadata section.")
+  end
 
   meta = YAML.load(pieces[2]) || {}
   content = pieces[4..-1].join.strip
