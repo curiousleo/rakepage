@@ -5,19 +5,14 @@ require 'kramdown'
 require 'mustache'
 
 config = {
-  'input_enc' => 'utf-8',
-  'input_ext' => '.mkd',
-  'input_dir' => 'pages',
-  'output_enc' => 'utf-8',
-  'output_ext' => '.html',
-  'output_dir' => 'output',
-  'template' => 'templates/template.mustache',
-  'assets' => 'media'
+  'input_enc' => 'utf-8', 'input_ext' => '.mkd', 'input_dir' => 'pages',
+  'output_enc' => 'utf-8', 'output_ext' => '.html', 'output_dir' => 'output',
+  'template' => 'templates/template.mustache', 'assets' => 'media'
 }
 
-$menu = nil
-
 config.merge! YAML.load File.open 'site.yaml'
+
+$menu = nil
 
 SRC_ASSETS = FileList[
   File.join config['assets'], '**', '*'].
