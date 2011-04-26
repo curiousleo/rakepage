@@ -53,18 +53,22 @@ file '.menu.yaml' => ['site.yaml'] do |t|
   File.open('.menu.yaml', 'w').write YAML.dump $menu
 end
 
+def dir_exists! f
+    mkpath File.dirname(out), :verbose => false
+end
+
 SRC_PAGES.zip(OUT_PAGES).each do |src, out|
   file out => [src, config['template'], '.menu.yaml'] do |t|
-    src, out, template = t.name, *t.prerequisites
-    make_page src, out, template
-    puts "generated #{t.name}"
+    out, src, template = t.name, *t.prerequisites
+    dir_exists! out
+    make_page out, src, template
   end
 end
 
 SRC_ASSETS.zip(OUT_ASSETS).each do |src, out|
-  file out => [src] do |t|
-    mkpath File.dirname(t.name), :verbose => false
-    cp t.prerequisites[0], t.name
+  file out => [src, 'site.yaml'] do |t|
+    dir_exists! t.name
+    cp t.prerequisites[0], t.name, :verbose => false
   end
 end
 
