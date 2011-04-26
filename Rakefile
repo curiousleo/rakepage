@@ -33,7 +33,7 @@ task :default => :gen
 
 desc 'generate the site'
 task :gen => OUT_PAGES + OUT_ASSETS + ['Rakefile'] do
-  puts 'done.'
+  puts 'Site generated.'
 end
 
 file '.menu.yaml' => ['site.yaml', config['template']] + SRC_PAGES do |t|
@@ -91,3 +91,17 @@ def make_page out, src, template
   File.open(out, 'w') {|f| f.write page}
 end
 
+task :auto do |t|
+  require 'watchr'
+
+  src_pages = File.join config['input_dir'], '**', '*' + config['input_ext']
+  src_assets = File.join config['assets'], '**', '*'
+
+  script = Watchr::Script.new
+  script.watch("[#{src_pages}]|[#{src_assets}]") do |file|
+    system("date +%T && rake -s"); end
+  controller = Watchr::Controller.new(script, Watchr.handler.new)
+
+  puts 'Started automatic site generation.'
+  controller.run
+end
