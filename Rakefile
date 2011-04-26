@@ -33,9 +33,10 @@ task :default => :gen
 
 desc 'generate the site'
 task :gen => OUT_PAGES + OUT_ASSETS + ['Rakefile'] do
+  puts 'done.'
 end
 
-file '.menu.yaml' => ['site.yaml'] + SRC_PAGES do |t|
+file '.menu.yaml' => ['site.yaml', config['template']] + SRC_PAGES do |t|
   $menu = []
   config['menu'].each do |p|
     src = File.join config['input_dir'], p + config['input_ext']
@@ -72,7 +73,7 @@ def parse_file src
   pieces = content.split(/^(-{3})/).compact
   if pieces.size < 3
     raise RuntimeError.new(
-      "The file '#{filename}' does not seem to have a metadata section.")
+      "The file '#{src}' does not seem to have a metadata section.")
   end
 
   meta = YAML.load(pieces[2]) || {}
