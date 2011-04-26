@@ -1,8 +1,9 @@
+# Navigation menu
 menu:
     - index
     - pages
     - paragraphs
     - phrasemods
 
-output:
-    ext: .htm
+# Settings
+output_ext: .htm

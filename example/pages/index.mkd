@@ -1,4 +1,6 @@
+---
 Title: Home
+---
 
 Index
 =====

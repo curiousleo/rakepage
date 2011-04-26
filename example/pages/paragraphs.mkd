@@ -1,4 +1,6 @@
+---
 Title: Paragraphs
+---
 
 h1. Paragraph Text
 
