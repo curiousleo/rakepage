@@ -26,6 +26,7 @@ OUT_PAGES = SRC_PAGES.collect do |s|
   s.sub(config['input_dir'], config['output_dir']).
     ext config['output_ext']; end
 
+CLEAN.include '.menu.yaml'
 CLOBBER.include OUT_ASSETS + OUT_PAGES
 
 task :default => :gen
@@ -35,12 +36,25 @@ task :gen => OUT_PAGES + OUT_ASSETS + ['Rakefile'] do
   puts 'Site generated.'
 end
 
+file '.menu.yaml' => ['site.yaml', config['template']] + SRC_PAGES do |t|
+  $menu = []
+  config['menu'].each do |p|
+    src = File.join config['input_dir'], p + config['input_ext']
+    meta, _ = parse_file src
+    out = src.sub(config['input_dir'] + '/', '').ext config['output_ext']
+    $menu << {
+      'title' => meta['Title'] || meta['title'],
+      'url' => out}
+  end
+  File.open('.menu.yaml', 'w').write YAML.dump $menu
+end
+
 def dir_exists! f
     mkpath File.dirname(f), :verbose => false
 end
 
 SRC_PAGES.zip(OUT_PAGES).each do |src, out|
-  file out => [src, config['template']] do |t|
+  file out => [src, config['template'], '.menu.yaml'] do |t|
     out, src, template = t.name, *t.prerequisites
     dir_exists! out
     make_page out, src, template
@@ -54,9 +68,24 @@ SRC_ASSETS.zip(OUT_ASSETS).each do |src, out|
   end
 end
 
+def parse_file src
+  content = IO.read src
+  pieces = content.split(/^(-{3})/).compact
+  if pieces.size < 3
+    raise RuntimeError.new(
+      "The file '#{src}' does not seem to have a metadata section.")
+  end
+
+  meta = YAML.load(pieces[2]) || {}
+  content = pieces[4..-1].join.strip
+  [meta, content]
+end
+
 def make_page out, src, template
+  meta, content = parse_file src
   context = {
-    :content => Tilt.new(src).render,
+    :content => Tilt::StringTemplate.new{content}.render,
+    :title => meta['Title'] || meta['title'],
     :menu => $menu }
   page = Mustache.render IO.read(template), context
   File.open(out, 'w') {|f| f.write page}
