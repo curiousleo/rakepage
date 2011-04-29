@@ -1,7 +1,3 @@
----
-Title: Paragraphs
----
-
 h1. Paragraph Text
 
 h2. Simple paragraphs
