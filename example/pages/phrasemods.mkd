@@ -1,3 +1,7 @@
+---
+title: Index
+---
+
 h1. Phrase modifiers
 
 h2. Strong importance
