@@ -26,7 +26,6 @@ OUT_PAGES = SRC_PAGES.collect do |s|
   s.sub(config['input_dir'], config['output_dir']).
     ext config['output_ext']; end
 
-CLEAN.include '.menu.yaml'
 CLOBBER.include OUT_ASSETS + OUT_PAGES
 
 task :default => :gen
@@ -41,7 +40,7 @@ def dir_exists! f
 end
 
 SRC_PAGES.zip(OUT_PAGES).each do |src, out|
-  file out => [src, config['template'], '.menu.yaml'] do |t|
+  file out => [src, config['template']] do |t|
     out, src, template = t.name, *t.prerequisites
     dir_exists! out
     make_page out, src, template
