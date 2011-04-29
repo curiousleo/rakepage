@@ -7,7 +7,7 @@ require 'mustache'
 config = {
   'input_enc' => 'utf-8', 'input_ext' => '.mkd', 'input_dir' => 'pages',
   'output_enc' => 'utf-8', 'output_ext' => '.html', 'output_dir' => 'output',
-  'template' => 'templates/template.mustache', 'assets' => 'media'
+  'layouts' => 'layouts/layout.mustache', 'assets' => 'media'
 }
 
 config.merge! YAML.load File.open 'site.yaml'
@@ -36,7 +36,7 @@ task :gen => OUT_PAGES + OUT_ASSETS + ['Rakefile'] do
   puts 'Site generated.'
 end
 
-file '.menu.yaml' => ['site.yaml', config['template']] + SRC_PAGES do |t|
+file '.menu.yaml' => ['site.yaml', config['layouts']] + SRC_PAGES do |t|
   $menu = []
   config['menu'].each do |p|
     src = File.join config['input_dir'], p + config['input_ext']
@@ -54,10 +54,10 @@ def dir_exists! f
 end
 
 SRC_PAGES.zip(OUT_PAGES).each do |src, out|
-  file out => [src, config['template'], '.menu.yaml'] do |t|
-    out, src, template = t.name, *t.prerequisites
+  file out => [src, config['layouts'], '.menu.yaml'] do |t|
+    out, src, layout = t.name, *t.prerequisites
     dir_exists! out
-    make_page out, src, template
+    make_page out, src, layout
   end
 end
 
@@ -81,13 +81,13 @@ def parse_file src
   [meta, content]
 end
 
-def make_page out, src, template
+def make_page out, src, layout
   meta, content = parse_file src
   context = {
     :content => Tilt::StringTemplate.new{content}.render,
     :title => meta['Title'] || meta['title'],
     :menu => $menu }
-  page = Mustache.render IO.read(template), context
+  page = Mustache.render IO.read(layout), context
   File.open(out, 'w') {|f| f.write page}
 end
 
