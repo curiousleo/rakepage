@@ -5,7 +5,7 @@ require 'tilt'
 require 'mustache'
 
 config = {
-  'input_enc' => 'utf-8', 'input_ext' => '.mkd', 'input_dir' => 'pages',
+  'input_enc' => 'utf-8', 'input_ext' => '.md', 'input_dir' => 'pages',
   'output_enc' => 'utf-8', 'output_ext' => '.html', 'output_dir' => 'output',
   'layouts' => 'layouts/layout.mustache', 'assets' => 'media'
 }
