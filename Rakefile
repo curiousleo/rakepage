@@ -1,13 +1,13 @@
 require 'rake/clean'
 require 'yaml'
 require 'rubygems'
-require 'tilt'
-require 'mustache'
+require 'kramdown'
+require 'liquid'
 
 config = {
   'input_enc' => 'utf-8', 'input_ext' => '.md', 'input_dir' => 'pages',
   'output_enc' => 'utf-8', 'output_ext' => '.html', 'output_dir' => 'output',
-  'layouts' => 'layouts/layout.mustache', 'assets' => 'media'
+  'layouts' => 'layouts/_default.liquid', 'assets' => 'media'
 }
 
 config.merge! YAML.load File.open 'site.yaml'
@@ -84,10 +84,11 @@ end
 def make_page out, src, layout
   meta, content = parse_file src
   context = {
-    :content => Tilt::StringTemplate.new{content}.render,
-    :title => meta['Title'] || meta['title'],
-    :menu => $menu }
-  page = Mustache.render IO.read(layout), context
+    'content' => Kramdown::Document.new(content).to_html,
+    'title' => meta['Title'] || meta['title'],
+    'menu' => $menu }
+  Liquid::Template.file_system = Liquid::LocalFileSystem.new('layouts')
+  page = Liquid::Template.parse(Liquid::Template.file_system.read_template_file 'default').render context
   File.open(out, 'w') {|f| f.write page}
 end
 
@@ -98,7 +99,7 @@ task :auto do |t|
   src_assets = File.join config['assets'], '**', '*'
 
   script = Watchr::Script.new
-  script.watch("[#{src_pages}]|[#{src_assets}]") do |file|
+  script.watch("[#{src_pages}]|[#{src_assets}]") do |f|
     system("date +%T && rake -s"); end
   controller = Watchr::Controller.new(script, Watchr.handler.new)
 
