@@ -9,6 +9,12 @@ contact with Ruby/Rake and I wrote it both to learn about the language(s) and
 because I thought it might make my life a bit easier. I use it to build a
 small, static website, and find it very useful.
 
+Dependencies
+------------
+
+Rakepage requires Ruby, Rake, and the Kramdown and Liquid gems. The `auto` mode
+depends on Watchr.
+
 Usage
 -----
 
