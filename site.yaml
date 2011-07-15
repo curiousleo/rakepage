@@ -1,0 +1,26 @@
+# site.yaml
+# 
+# This is an example rakepage configuration file comprising
+# all available options with their default values.
+
+# List of pages for navigation menu
+menu:
+  - index
+  - about
+  - contact
+
+# Input options
+input_enc: utf-8
+input_ext: .md
+input_dir: pages
+
+# Output options
+output_enc: utf-8
+output_ext: .html
+output_dir: output
+
+# Default Liquid layout
+layout: layouts/_default.liquid 
+
+# Path to static files (css, js etc.)
+assets: media
